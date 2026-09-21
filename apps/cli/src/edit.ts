@@ -1,11 +1,14 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { Discard, Edl, EditProfile, Input, Source } from "@doslineas/core";
+import type { Discard, Edl, EditProfile, Input, Source, Transcript } from "@doslineas/core";
 import type { Overlap } from "@doslineas/core";
 import {
+  DEFAULT_FAREWELL_PHRASES,
   DEFAULT_INTRO_PHRASES,
+  DEFAULT_OFF_AIR_PHRASES,
   buildEdl,
   findIntroStart,
+  findOutroEnd,
   measureEdit,
   mergeDiscards,
   parseProfile,
@@ -104,6 +107,38 @@ export async function ingest(directory: string, profile: EditProfile, force: boo
   };
 }
 
+function deepgramKey(): string | null {
+  const apiKey = process.env["DEEPGRAM_API_KEY"];
+  return apiKey === undefined || apiKey === "" ? null : apiKey;
+}
+
+async function transcribeProgram(
+  session: IngestedSession,
+  directory: string,
+  language: string,
+  apiKey: string,
+  name: string,
+  fromSeconds: number,
+  seconds: number
+): Promise<Transcript> {
+  const excerpt = join(directory, `${name}-search.flac`);
+  await runOrFail("ffmpeg", [
+    "-y", "-hide_banner",
+    "-ss", String(fromSeconds),
+    "-t", String(seconds),
+    "-i", session.programAudio,
+    "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac",
+    excerpt,
+    "-loglevel", "error"
+  ]);
+
+  try {
+    return await deepgramTranscriber({ apiKey }).transcribe({ audioPath: excerpt, session: name, language, diarize: false });
+  } finally {
+    await rm(excerpt, { force: true });
+  }
+}
+
 export async function introDiscard(
   session: IngestedSession,
   profile: EditProfile,
@@ -114,31 +149,14 @@ export async function introDiscard(
   if (settings === undefined) return null;
 
   const phrases = settings.phrases.length > 0 ? settings.phrases : DEFAULT_INTRO_PHRASES;
-  const apiKey = process.env["DEEPGRAM_API_KEY"];
-  if (apiKey === undefined || apiKey === "") {
+  const apiKey = deepgramKey();
+  if (apiKey === null) {
     console.error("  no DEEPGRAM_API_KEY: the opening cannot be found, nothing is trimmed at the head");
     return null;
   }
 
   const searchSeconds = settings.searchSeconds ?? INTRO_DEFAULTS.searchSeconds;
-  const head = join(directory, "intro-search.flac");
-  await runOrFail("ffmpeg", [
-    "-y", "-hide_banner",
-    "-t", String(searchSeconds),
-    "-i", session.programAudio,
-    "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac",
-    head,
-    "-loglevel", "error"
-  ]);
-
-  const transcriber = deepgramTranscriber({ apiKey });
-  const transcript = await transcriber.transcribe({
-    audioPath: head,
-    session: "intro",
-    language,
-    diarize: false
-  });
-  await rm(head, { force: true });
+  const transcript = await transcribeProgram(session, directory, language, apiKey, "intro", 0, searchSeconds);
 
   const found = findIntroStart(transcript, phrases);
   if (found === null) {
@@ -150,6 +168,42 @@ export async function introDiscard(
   const tEnd = Math.max(0, found - lead);
   console.log(`  opening heard at ${found.toFixed(1)} s: the first ${tEnd.toFixed(1)} s go`);
   return tEnd <= 0 ? null : { tIn: 0, tEnd, reason: "manual" };
+}
+
+export async function outroDiscard(
+  session: IngestedSession,
+  profile: EditProfile,
+  directory: string,
+  language: string
+): Promise<Discard | null> {
+  const settings = profile.outro;
+  if (settings === undefined) return null;
+
+  const apiKey = deepgramKey();
+  if (apiKey === null) {
+    console.error("  no DEEPGRAM_API_KEY: the farewell cannot be found, nothing is trimmed at the tail");
+    return null;
+  }
+
+  const duration = session.inspection.durationSeconds;
+  const fromSeconds = Math.max(0, duration - settings.searchSeconds);
+  const transcript = await transcribeProgram(session, directory, language, apiKey, "outro", fromSeconds, settings.searchSeconds);
+
+  const found = findOutroEnd(transcript, {
+    farewells: settings.phrases.length > 0 ? settings.phrases : DEFAULT_FAREWELL_PHRASES,
+    offAir: settings.offAirPhrases.length > 0 ? settings.offAirPhrases : DEFAULT_OFF_AIR_PHRASES,
+    joinSeconds: settings.joinSeconds,
+    tailSeconds: settings.tailSeconds
+  });
+  if (found === null) {
+    console.error(`  no farewell in the last ${settings.searchSeconds.toFixed(0)} s: nothing is trimmed at the tail`);
+    return null;
+  }
+
+  const tIn = fromSeconds + found;
+  if (tIn >= duration) return null;
+  console.log(`  farewell over at ${tIn.toFixed(1)} s: the last ${(duration - tIn).toFixed(1)} s go`);
+  return { tIn, tEnd: duration, reason: "manual" };
 }
 
 export async function screenMoments(session: IngestedSession, profile: EditProfile): Promise<number[]> {
@@ -166,7 +220,7 @@ export async function screenMoments(session: IngestedSession, profile: EditProfi
 export async function analyse(
   session: IngestedSession,
   profile: EditProfile,
-  opening?: Discard | null,
+  trims: readonly (Discard | null)[] = [],
   moments: readonly number[] = []
 ): Promise<Edl> {
   const people = personInputs(profile, session.input4Role);
@@ -182,9 +236,10 @@ export async function analyse(
   const programSamples = await extractSamples(session.programAudio, { sampleRate: SAMPLE_RATE });
   const programEnvelope = envelopeDb(programSamples, SAMPLE_RATE, profile.voice.windowMs);
   const silenceDiscards = silencesToDiscards(detectSilences(programEnvelope, profile), profile);
-  const discards = mergeDiscards(
-    opening === undefined || opening === null ? silenceDiscards : [opening, ...silenceDiscards]
-  );
+  const discards = mergeDiscards([
+    ...trims.filter((trim): trim is Discard => trim !== null),
+    ...silenceDiscards
+  ]);
 
   const settings = { ...SCREEN_DEFAULTS, ...(profile.screen ?? {}) };
   const slideSpans = screenSpans([...moments], session.inspection.durationSeconds, settings.minSpanSeconds);
@@ -295,9 +350,11 @@ export async function editCommand(args: readonly string[]): Promise<void> {
   console.log(`  ${inspection.durationSeconds.toFixed(1)} s at ${inspection.fps} fps · input 4 carries a ${session.input4Role}`);
   if (out !== inspection.directory) console.log(`  writing to ${out}`);
 
-  const opening = args.includes("--no-intro") ? null : await introDiscard(session, profile, out, flag(args, "language", "es"));
+  const language = flag(args, "language", "es");
+  const opening = args.includes("--no-intro") ? null : await introDiscard(session, profile, out, language);
+  const closing = args.includes("--no-outro") ? null : await outroDiscard(session, profile, out, language);
   const moments = await screenMoments(session, profile);
-  const edl = await analyse(session, profile, opening, moments);
+  const edl = await analyse(session, profile, [opening, closing], moments);
   const metrics = measureEdit(edl);
   const spans = screenSpansOf(profile, edl, moments);
 

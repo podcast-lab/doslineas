@@ -24,9 +24,10 @@ const HELP = `doslineas — development and rescue tool
       copies a recording off the read-only disk into the sessions root, and only then makes it visible
       --into defaults to DOSLINEAS_SESSIONS; --name defaults to the name of the source directory
 
-  edit <directory> [--render] [--force] [--encoder <name>] [--preset <name>] [--profile <path>] [--out <dir>] [--no-intro] [--language <code>]
+  edit <directory> [--render] [--force] [--encoder <name>] [--preset <name>] [--profile <path>] [--out <dir>] [--no-intro] [--no-outro] [--language <code>]
       ingests a session directory, analyses it, writes edl.json and edit.fcpxml, and optionally the master
       --out sends everything it writes to another directory; --no-intro keeps the head instead of cutting to the opening line
+      --no-outro keeps the tail instead of cutting after the farewell
 
   brand <directory> [--render] [--kit <path>] [--episode <path>] [--encoder <name>] [--preset <name>] [--concurrency <n>]
       plans intro, outro and lower thirds over an existing edl.json, and optionally renders master-branded.mp4

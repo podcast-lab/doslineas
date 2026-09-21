@@ -65,6 +65,15 @@ export const EditProfileSchema = z
         searchSeconds: z.number().positive()
       })
       .optional(),
+    outro: z
+      .object({
+        phrases: z.array(z.string().min(1)),
+        offAirPhrases: z.array(z.string().min(1)),
+        joinSeconds: z.number().positive(),
+        tailSeconds: z.number().nonnegative(),
+        searchSeconds: z.number().positive()
+      })
+      .optional(),
     screen: z
       .object({
         jumpRatio: z.number().min(0).max(1),

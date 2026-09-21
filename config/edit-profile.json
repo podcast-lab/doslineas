@@ -1,6 +1,6 @@
 {
   "name": "podcast-v1",
-  "description": "Values measured on 2026-08-08 over the four reference videos from the client (annex A of the technical plan, rev 4). silence.thresholdSeconds raised to 5 on 2026-09-03 at the client's request: trim only long dead air, keep short pauses. inputs set to the studio's real wiring on 2026-09-04, confirmed permanent by the client: 1 and 2 are the speakers, 3 is the wide shot, 4 is variable.",
+  "description": "Values measured on 2026-08-08 over the four reference videos from the client (annex A of the technical plan, rev 4). silence.thresholdSeconds raised to 5 on 2026-09-03 at the client's request: trim only long dead air, keep short pauses. inputs set to the studio's real wiring on 2026-09-04, confirmed permanent by the client: 1 and 2 are the speakers, 3 is the wide shot, 4 is variable. outro added on 2026-09-21: the edit ends after the last farewell, with the default phrase lists.",
   "shot": {
     "minSeconds": 1.2,
     "maxSeconds": 15.0,
@@ -38,6 +38,13 @@
     "screenDuplicateRatio": 0.15,
     "sampleSeconds": 30.0,
     "forcedRole": null
+  },
+  "outro": {
+    "phrases": [],
+    "offAirPhrases": [],
+    "joinSeconds": 0.8,
+    "tailSeconds": 1.0,
+    "searchSeconds": 240
   },
   "screen": {
     "jumpRatio": 0.12,

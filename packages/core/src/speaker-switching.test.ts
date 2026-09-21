@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildEdl } from "./edit-engine.js";
 import { mergeDiscards } from "./edl.js";
-import { findIntroStart, normaliseWord } from "./intro.js";
+import { findIntroStart } from "./intro.js";
+import { normaliseWord } from "./phrases.js";
 import { parseProfile } from "./profile.js";
 import type { EditProfile, Input, Source, Transcript } from "./index.js";
 

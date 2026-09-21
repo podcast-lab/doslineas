@@ -63,6 +63,29 @@ el recorte de silencios ya marcaba.
 
 Sin `DEEPGRAM_API_KEY`, o si ninguna frase aparece, avisa y no recorta nada. `--no-intro` lo desactiva.
 
+### Terminar en la despedida
+
+El final es el espejo: gente comentando cómo ha ido, «¿cómo fluyó?», alguien pidiendo que se corte.
+
+`outro` transcribe los últimos `searchSeconds` del audio de programa y busca dos listas:
+
+- **`phrases`, las despedidas** («nos vemos», «un abrazo», «adiós», «suscríbete»…). Manda **la última**
+  que se oiga. Desde ahí sigue por las palabras que vienen pegadas, sin un hueco de `joinSeconds` o más
+  («adiós **a todos**»), y deja `tailSeconds` de margen sin llegar nunca a la palabra siguiente. Todo lo
+  de después es un descarte `manual`, igual que la cabecera.
+- **`offAirPhrases`, las de fin de grabación** («corta», «ya está», «listo», «esto fuera»…). Solo
+  cuentan **detrás de una despedida**, y lo único que hacen es parar ahí el recorrido. Solas no cortan
+  nada: «listo» o «ya está» salen en mitad de la charla, y un falso positivo aquí se lleva contenido bueno
+  sin que nadie se entere.
+
+En una frase, `*` vale por una a tres palabras cualquiera, para el nombre del invitado: «muchas gracias
+\* por venir» encaja con «muchas gracias, Piru, por venir». Con las listas vacías se usan
+`DEFAULT_FAREWELL_PHRASES` y `DEFAULT_OFF_AIR_PHRASES` (`packages/core/src/outro.ts`).
+
+Tomar la **última** despedida es a propósito: si falla, falla hacia dejar un poco de cola, nunca hacia
+comerse el final del programa. Sin `DEEPGRAM_API_KEY`, o si no hay despedida, avisa y no recorta.
+`--no-outro` lo desactiva.
+
 ### La carpeta de salida
 
 `edit --out <dir>` escribe el EDL, el FCPXML, los ficheros de FFmpeg y los masters donde se le diga, en vez

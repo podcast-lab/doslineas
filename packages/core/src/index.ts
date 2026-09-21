@@ -15,3 +15,5 @@ export * from "./shorts.js";
 export * from "./explainer-profile.js";
 export * from "./explainer.js";
 export * from "./intro.js";
+export * from "./outro.js";
+export * from "./phrases.js";
