@@ -1,0 +1,29 @@
+{
+  "name": "explainer-v1",
+  "description": "Short explainer with split screen (section 2.3 of the technical plan, rev 4). The signal comes from the picture of input 4, not from the microphone: while the screen moves it takes over, and the person stays in a corner so nobody is ever out of frame.",
+  "sampling": {
+    "fps": 4,
+    "width": 64,
+    "height": 36,
+    "toleranceLevels": 10
+  },
+  "activity": {
+    "changedRatio": 0.02,
+    "jumpRatio": 0.12,
+    "openMs": 500,
+    "closeMs": 1500,
+    "tailSeconds": 2.0
+  },
+  "layout": {
+    "personInput": 2,
+    "screenInput": 4,
+    "minHoldSeconds": 3.0,
+    "insetPercent": 26,
+    "insetCorner": "bottom-right",
+    "insetMarginPercent": 3
+  },
+  "frame": {
+    "width": 1920,
+    "height": 1080
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@doslineas/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "doslineas": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@doslineas/analysis": "workspace:*",
+    "@doslineas/core": "workspace:*",
+    "@doslineas/graphics": "workspace:*",
+    "@doslineas/media": "workspace:*",
+    "@doslineas/pipeline": "workspace:*",
+    "@doslineas/providers": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1"
+  }
+}

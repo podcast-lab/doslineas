@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.work/
+out/
+fixtures/generated/
+.env
+*.stackdump
+*.pdf
+fuentes/

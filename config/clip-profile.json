@@ -1,0 +1,69 @@
+{
+  "name": "clips-v1",
+  "description": "Vertical clips for social media. Lengths and caption rhythm follow the reference videos from the client (annex A of the technical plan, rev 4); the scoring weights are a starting point and are meant to be tuned once real episodes are cut.",
+  "clip": {
+    "minSeconds": 20.0,
+    "maxSeconds": 60.0,
+    "targetSeconds": 40.0,
+    "count": 4
+  },
+  "grouping": {
+    "utteranceGapSeconds": 0.7,
+    "wordsPerSecondReference": 3.2
+  },
+  "padding": {
+    "leadSeconds": 0.3,
+    "tailSeconds": 0.5
+  },
+  "frame": {
+    "width": 1080,
+    "height": 1920
+  },
+  "layout": "crop",
+  "anchors": {
+    "1": 0.5,
+    "2": 0.5,
+    "3": 0.5,
+    "4": 0.5
+  },
+  "captions": {
+    "maxSeconds": 2.4,
+    "maxCharacters": 42,
+    "gapSeconds": 0.5,
+    "safeAreaPercent": 12,
+    "position": "bottom",
+    "withTitle": true,
+    "withSpeakers": false
+  },
+  "scoring": {
+    "density": 1.0,
+    "fit": 1.5,
+    "opening": 2.0,
+    "closing": 1.5,
+    "exchange": 1.0,
+    "hooks": 2.0,
+    "question": 1.0
+  },
+  "hookWords": [
+    "la clave",
+    "lo importante",
+    "el error",
+    "la verdad",
+    "nadie",
+    "nunca",
+    "siempre",
+    "por ejemplo",
+    "me di cuenta",
+    "aprendi",
+    "el problema",
+    "lo que pasa",
+    "de hecho",
+    "en realidad",
+    "el secreto",
+    "la primera vez"
+  ],
+  "llm": {
+    "model": "claude-opus-5",
+    "enabled": true
+  }
+}

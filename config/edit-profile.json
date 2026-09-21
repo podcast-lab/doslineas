@@ -1,0 +1,50 @@
+{
+  "name": "podcast-v1",
+  "description": "Values measured on 2026-08-08 over the four reference videos from the client (annex A of the technical plan, rev 4). silence.thresholdSeconds raised to 5 on 2026-09-03 at the client's request: trim only long dead air, keep short pauses. inputs set to the studio's real wiring on 2026-09-04, confirmed permanent by the client: 1 and 2 are the speakers, 3 is the wide shot, 4 is variable.",
+  "shot": {
+    "minSeconds": 1.2,
+    "maxSeconds": 15.0,
+    "targetSeconds": 4.5
+  },
+  "cuts": {
+    "perMinuteTarget": 10.0,
+    "perMinuteTolerance": 2.0
+  },
+  "silence": {
+    "thresholdSeconds": 5.0,
+    "paddingSeconds": 0.3,
+    "thresholdDb": -32.0
+  },
+  "voice": {
+    "windowMs": 20,
+    "calibrationSeconds": 5.0,
+    "dominanceMarginDb": 6.0,
+    "aboveNoiseMarginDb": 12.0,
+    "openHysteresisMs": 250,
+    "closeHysteresisMs": 300
+  },
+  "refresh": {
+    "afterSeconds": 4.5,
+    "minHoldSeconds": 2.0,
+    "preference": ["listening", "wide"]
+  },
+  "inputs": {
+    "1": "speaker1",
+    "2": "speaker2",
+    "3": "wide",
+    "4": "variable"
+  },
+  "input4": {
+    "screenDuplicateRatio": 0.15,
+    "sampleSeconds": 30.0,
+    "forcedRole": null
+  },
+  "screen": {
+    "jumpRatio": 0.12,
+    "minSpacingSeconds": 15.0,
+    "minSpanSeconds": 4.0,
+    "insetPercent": 26,
+    "insetCorner": "bottom-right",
+    "insetMarginPercent": 3
+  }
+}
