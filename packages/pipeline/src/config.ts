@@ -1,4 +1,6 @@
 import { resolve } from "node:path";
+import type { Encoder } from "@doslineas/media";
+import { parseEncoder } from "@doslineas/media";
 
 export interface PipelineConfig {
   readonly studio: string;
@@ -14,6 +16,7 @@ export interface PipelineConfig {
   readonly maxAttempts: number;
   readonly port: number;
   readonly transcriber: "deepgram" | "mock";
+  readonly encoder: Encoder | null;
 }
 
 function number(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -36,6 +39,16 @@ function transcriber(env: NodeJS.ProcessEnv): "deepgram" | "mock" {
   return raw;
 }
 
+function encoder(env: NodeJS.ProcessEnv): Encoder | null {
+  const raw = text(env, "DOSLINEAS_ENCODER", "");
+  if (raw === "") return null;
+  try {
+    return parseEncoder(raw);
+  } catch {
+    throw new Error(`DOSLINEAS_ENCODER is not an encoder the renders know: ${raw}`);
+  }
+}
+
 export function readConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig {
   const repoRoot = resolve(text(env, "DOSLINEAS_REPO", process.cwd()));
 
@@ -52,6 +65,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig
     idleMs: number(env, "DOSLINEAS_IDLE_SECONDS", 5) * 1_000,
     maxAttempts: number(env, "DOSLINEAS_MAX_ATTEMPTS", 2),
     port: number(env, "DOSLINEAS_PORT", 4310),
-    transcriber: transcriber(env)
+    transcriber: transcriber(env),
+    encoder: encoder(env)
   };
 }

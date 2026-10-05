@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Job, StepName } from "./jobs.js";
+import { readConfig } from "./config.js";
 import { CliStepRunner } from "./runner.js";
+import { encoderFlags } from "./steps.js";
 
 function job(step: StepName, directory: string): Job {
   return {
@@ -60,6 +62,23 @@ describe("running a step through the command line", () => {
   it("passes the extra flags of a step through", () => {
     const withRules = new CliStepRunner({ repoRoot: process.cwd(), entry, flags: { clips: ["--rules"] } });
     expect(withRules.argumentsFor(job("clips", "/sessions/ep12"))).toContain("--rules");
+  });
+
+  it("renders every step with the encoder of the machine", () => {
+    const flags = encoderFlags("h264_videotoolbox");
+    const withEncoder = new CliStepRunner({ repoRoot: process.cwd(), entry, flags });
+
+    for (const step of ["edit", "brand", "clips", "explainer"] as const) {
+      expect(withEncoder.argumentsFor(job(step, "/sessions/ep12")).slice(-2)).toEqual(["--encoder", "h264_videotoolbox"]);
+    }
+    expect(withEncoder.argumentsFor(job("transcribe", "/sessions/ep12"))).not.toContain("--encoder");
+    expect(encoderFlags(null)).toEqual({});
+  });
+
+  it("refuses an encoder the renders do not know before taking any job", () => {
+    expect(readConfig({ DOSLINEAS_ENCODER: "h264_videotoolbox" }).encoder).toBe("h264_videotoolbox");
+    expect(readConfig({}).encoder).toBeNull();
+    expect(() => readConfig({ DOSLINEAS_ENCODER: "videotoolbox" })).toThrow(/DOSLINEAS_ENCODER/);
   });
 
   it("refuses to shell out for a step that has no command", () => {

@@ -114,6 +114,7 @@ Todo por entorno, sin fichero nuevo:
 | `DOSLINEAS_MAX_ATTEMPTS` | `2` | Intentos antes de rendirse |
 | `DOSLINEAS_TRANSCRIBER` | `deepgram` | `mock` usa `mock-transcript` y no gasta ni una llamada |
 | `DOSLINEAS_PORT` | `4310` | El panel |
+| `DOSLINEAS_ENCODER` | vacío (`libx264`) | El `--encoder` con el que el worker lanza `edit`, `brand`, `clips` y `explainer`; en el iMac, `h264_videotoolbox`. Uno que no existe para el arranque |
 
 ## Cómo se levanta
 

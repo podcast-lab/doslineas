@@ -76,6 +76,13 @@ export function stepDefinition(name: StepName): StepDefinition {
   return found;
 }
 
+export function encoderFlags(encoder: string | null): Partial<Record<StepName, readonly string[]>> {
+  if (encoder === null) return {};
+  return Object.fromEntries(
+    PIPELINE.filter((step) => step.flags.includes("--render")).map((step) => [step.name, ["--encoder", encoder]])
+  );
+}
+
 export function plannedJobs(
   studio: string,
   session: string,

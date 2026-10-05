@@ -12,7 +12,7 @@ async function bootstrap(): Promise<void> {
   context.enableShutdownHooks();
 
   new Logger("worker").log(
-    `${workerName()} · studio ${config.studio} · sessions in ${config.sessionsRoot} · delivering to ${config.deliveryRoot}`
+    `${workerName()} · studio ${config.studio} · sessions in ${config.sessionsRoot} · delivering to ${config.deliveryRoot} · encoder ${config.encoder ?? "libx264"}`
   );
 }
 

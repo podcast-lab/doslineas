@@ -198,6 +198,8 @@ vocabulario, porque `veryfast` es de x264 y NVENC quiere `p1` y AMF quiere `spee
 puede pasar el preset nativo y va tal cual. Medido en este PC sobre 40 s a 720p: NVENC 3,7 s, x264 4,6 s,
 QSV 5,5 s. Los detalles y la trampa de comparar tamaños, en `docs/encoders-y-medicion.md`.
 
+El worker no teclea flags: renderiza con lo que diga `DOSLINEAS_ENCODER`, y sin ella con `libx264`.
+
 ## El montaje, medido contra el anexo A
 
 Los dos generadores del plan: `turnCuts` reacciona al cambio de interlocutor y `refreshCuts` refresca el

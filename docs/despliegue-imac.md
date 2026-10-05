@@ -1,153 +1,106 @@
 # Poner el software a correr en el iMac del estudio
 
-Máquina: **iMac Retina 5K 27" de 2017**, i7-7700K (4 núcleos), Radeon Pro 580 8 GB, 32 GB de RAM,
-**macOS Ventura 13.7.8**. Es la misma que hace de router del ATEM y de servidor FTPS, y la que ve por SMB el
-disco USB-C del ATEM.
+Máquina: **iMac Retina 5K 27" de 2017** (`iMac-de-Helena.local`), i7-7700K de 4 núcleos, Radeon Pro 580 8 GB,
+32 GB de RAM, **macOS Ventura 13.7.8**, Intel `x86_64`. El usuario del escritorio es **`helena`**, y el software
+corre como ella, no como root.
 
-## 1. El reparto de discos, antes que nada
+## 1. Instalar o actualizar: un solo script
+
+`deploy/macos/install.command` deja la máquina lista desde cero, y si se vuelve a ejecutar, actualiza. Se puede
+lanzar de tres formas, y las tres hacen lo mismo:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/podcast-lab/doslineas/main/deploy/macos/install.command | bash
+```
+
+- **Desde la Terminal de Helena**: se pega esa línea. Pide su contraseña cuando le toca instalar Node o FFmpeg.
+- **Desde la Shell de DWService**, que entra como root: la misma línea. El script detecta quién tiene la
+  sesión abierta en la pantalla y lo instala para ese usuario. Para elegirlo a mano,
+  `DOSLINEAS_USER=helena` delante de `bash`.
+- **Con doble clic** sobre `install.command` en Finder, si se tiene el repo descomprimido. Un `.command`
+  descargado suelto con el navegador pierde el permiso de ejecución y Gatekeeper lo frena, así que para
+  alguien que no es técnico la línea de la Terminal es más sencilla. Firmarlo no hace falta para nada de esto.
+
+**Para actualizar** después: `deploy/macos/update.command`, que baja la última versión del instalador y la
+ejecuta. Se niega si hay un paso a medias (un render o una transcripción), porque cortarlo gasta un intento
+del trabajo; `--force` lo corta igualmente. `--keys` vuelve a pedir las claves de API.
+
+### Lo que hace, por orden
+
+1. **Node 22** con el `.pkg` oficial de nodejs.org, comprobando su checksum, si no está ya.
+2. **FFmpeg y ffprobe estáticos** de evermeet.cx en `/usr/local/bin`, si no hay una versión 7 o más
+   nueva. Desde la 7 existe `-/filter_complex`, y el render lo necesita.
+3. Para los dos servicios, salvo que haya un paso corriendo.
+4. Baja el código de GitHub como `.tar.gz` a `~/doslineas/app`. Conserva el `.env` anterior, y si
+   encuentra el de la instalación a mano del 11/09 (`~/podcast-tool/.env`), también lo recoge.
+5. Instala `pnpm` en la versión que fija `packageManager`, y luego las dependencias con
+   `--frozen-lockfile`.
+6. Completa el `.env` (permisos `600`) con el área de trabajo y `DOSLINEAS_ENCODER=h264_videotoolbox`
+   si ese encoder existe, y pide las claves de Deepgram y Anthropic que falten.
+7. Instala dos LaunchAgents, `com.doslineas.worker` y `com.doslineas.panel`, con `KeepAlive`: arrancan
+   al iniciar sesión y se levantan otra vez si se caen. Los registros quedan en `~/doslineas/logs/`.
+8. Crea **`~/Applications/Dos Lineas.app`** y lo añade al Dock. Ese icono arranca los servicios si están
+   parados y abre el panel en `http://localhost:4310`. Como el `.app` se genera en la propia máquina, no
+   lleva la marca de descarga y Gatekeeper no pregunta nada.
+9. Comprueba que VideoToolbox codifica de verdad, que el panel responde y que el worker está corriendo.
+
+Por qué **no se usa Homebrew ni git**: Homebrew se niega a correr como root y arrastra las Command Line
+Tools, que abren una ventana gráfica imposible de manejar por control remoto. Y `/usr/bin/git` en una Mac
+sin esas herramientas es un señuelo que lanza ese mismo instalador.
+
+## 2. El reparto de discos
 
 | Sitio | Qué vive ahí | Quién escribe |
 |---|---|---|
-| Disco USB-C del ATEM (montaje SMB) | el bruto tal cual sale, capa de retención | **sólo el ATEM** |
-| `~/doslineas/incoming` | copia en curso desde el disco del ATEM | el script de ingesta |
-| `~/doslineas/sessions` | sesiones completas: bruto + intermedios + másteres | el software |
+| Compartido `smb://192.168.2.210/sala001` | el bruto, junto con todo el trabajo del estudio | **nadie de los nuestros** |
+| `~/doslineas/sessions` | sesiones completas: bruto copiado + intermedios + másteres | el software |
 | `~/doslineas/delivered` | lo entregado | el software |
+| `~/doslineas/state` | la cola y los avisos | el software |
+| `~/doslineas/app` | el código y su `.env` | el instalador |
 
-En el iMac hay que pasar **`--encoder h264_videotoolbox`** y la calidad por **bitrate** (`--quality 24M`; 16M por
-defecto), porque en Intel no hay calidad constante.
+**El compartido no puede ser `DOSLINEAS_SESSIONS`.** Cada paso escribe en la carpeta de la sesión
+(`packages/pipeline/src/steps.ts`) y `cli confirm` borra el bruto de ahí (`packages/pipeline/src/raw.ts`).
+Además, ese compartido tiene material de otros clientes.
 
-**El disco del ATEM no puede ser `DOSLINEAS_SESSIONS`.** Cada paso escribe sus artefactos dentro de la carpeta
-de la sesión (`packages/pipeline/src/steps.ts`) y `cli confirm` borra el bruto de esa misma carpeta
-(`packages/pipeline/src/raw.ts`). Apuntar ahí sería escribir y borrar en el disco donde graba el ATEM.
+Hacen falta **~25 GB libres por episodio en vuelo**. El 11/09 había 365 GB libres.
 
-Hacen falta **~25 GB libres por episodio en vuelo** (44 GB por hora grabada de bruto, ~1 GB de salidas).
+## 3. La ingesta: copiar, y luego mover
 
-## 2. Lo que hay que instalar
-
-```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install node@22 ffmpeg git
-echo 'export PATH="/usr/local/opt/node@22/bin:$PATH"' >> ~/.zprofile
-corepack enable
-node -v && ffmpeg -version | head -1 && pnpm -v
-```
-
-No hay ningún módulo nativo que compilar: la cola usa `node:sqlite`, que viene dentro de Node. Remotion se
-descarga su propio Chrome Headless Shell la primera vez que renderiza, así que esa primera vez necesita internet.
-
-## 3. El repositorio y las claves
+Nunca procesar leyendo del compartido, y nunca copiar mientras el ATEM graba.
 
 ```sh
-mkdir -p ~/doslineas && cd ~/doslineas
-git clone <repo> podcast-tool && cd podcast-tool
-pnpm install
-printf 'DEEPGRAM_API_KEY=...\nANTHROPIC_API_KEY=...\n' > .env
+pnpm cli ingest "/Volumes/sala001/atem mini pro iso 5"
 ```
 
-`pnpm cli`, el worker y la API cargan ese `.env` con `tsx --env-file-if-exists`.
+Copia a `_incoming/` dentro de `DOSLINEAS_SESSIONS` y al terminar la mueve a su sitio. El `mv` dentro del
+mismo volumen es atómico, así que el vigilante nunca ve una sesión a medias.
 
-## 4. La configuración, por entorno
+## 4. Lo que el instalador no puede hacer solo
 
-En `~/doslineas/env.sh`:
+- **Que la sesión de `helena` esté iniciada.** Un LaunchAgent vive en la sesión del usuario: si el iMac se
+  reinicia y nadie entra, no arranca nada. Hay que activar el inicio de sesión automático en
+  Ajustes del Sistema → Usuarios y grupos.
+- **Que el compartido se monte solo.** Hoy `mount_smbfs` pide la contraseña por teclado. Se resuelve
+  guardándola en el Llavero de `helena` al conectar desde Finder y añadiendo el volumen a los ítems de inicio,
+  pero depende de que el `.210` vuelva a responder (pendiente de Enrique).
+- **Que no se duerma:** `sudo pmset -a sleep 0 disksleep 0 autorestart 1`. El reposo ya estaba a 0 el 11/09.
+
+## 5. Operación diaria
+
+El icono **Dos Lineas** del Dock abre el panel. Por consola, desde `~/doslineas/app`:
 
 ```sh
-export DOSLINEAS_REPO="$HOME/doslineas/podcast-tool"
-export DOSLINEAS_SESSIONS="$HOME/doslineas/sessions"
-export DOSLINEAS_DELIVERY="$HOME/doslineas/delivered"
-export DOSLINEAS_DB="$HOME/doslineas/state/jobs.db"
-export DOSLINEAS_QUIET_SECONDS=120
+pnpm cli status                           # la cola y los avisos
+pnpm cli retry <sesión> [--step <paso>]   # rescatar un paso
+pnpm cli confirm <sesión> --dry-run       # qué bruto se iría; sin la bandera, lo borra
+tail -f ~/doslineas/logs/worker.log       # lo que está haciendo el worker
 ```
 
-## 5. Comprobar que la máquina puede, en este orden
+## 6. Lo que queda por resolver en la máquina
 
-```sh
-cd ~/doslineas/podcast-tool
-pnpm test && pnpm lint && pnpm typecheck
-
-ffmpeg -h encoder=h264_videotoolbox                       # que exista el encoder
-ffmpeg -f lavfi -i testsrc=size=1920x1080:rate=25 -t 10 \
-  -c:v h264_videotoolbox -b:v 16M /tmp/vt.mp4             # que codifique de verdad
-
-pnpm cli generate-session /tmp/fake --duration 120        # una sesión sintética
-pnpm cli edit /tmp/fake --render --encoder h264_videotoolbox --quality 24M
-DOSLINEAS_TRANSCRIBER=mock pnpm cli transcribe /tmp/fake
-```
-
-Con eso está probada la cadena entera sin gastar una llamada a Deepgram. Después, un episodio real cronometrado:
-es el único número que vale para prometer tiempos. La estimación de partida es **2–4 h por episodio** (máster +
-2ª pasada de la pantalla + marca + los 4 clips de Remotion), y el cuello no es el encode —VideoToolbox lo
-acelera— sino **decodificar los 4 ISO con 4 núcleos**.
-
-## 6. La ingesta: copiar, y luego mover
-
-Nunca procesar leyendo del disco del ATEM, y nunca copiar mientras el ATEM graba.
-
-```sh
-#!/bin/sh
-set -e
-src="$1"                                   # carpeta de la sesión en el montaje SMB del ATEM
-name="$(basename "$src")"
-rsync -a --info=progress2 "$src/" "$HOME/doslineas/incoming/$name/"
-mv "$HOME/doslineas/incoming/$name" "$HOME/doslineas/sessions/$name"
-```
-
-El `mv` dentro del mismo volumen es atómico, así que el vigilante nunca ve una sesión a medias y la heurística
-de los 120 s de quietud deja de importar. 18 GB por Gigabit son unos 3 minutos.
-
-El vigilante inspecciona la sesión antes de encolar y levanta un aviso si falta un ISO, el programa o el `.drp`,
-o si algún fichero no se puede leer; `pnpm cli status` lo muestra. Para mirar un fichero suelto a mano,
-`pnpm cli probe <fichero...>` da duración, fps, resolución y audio.
-
-## 7. Que arranque solo y no se duerma
-
-```sh
-sudo pmset -a sleep 0 disksleep 0 displaysleep 10 autorestart 1
-```
-
-`~/Library/LaunchAgents/com.doslineas.worker.plist` (y otro igual para `@doslineas/api`, que sirve el panel en
-el 4310):
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.doslineas.worker</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/sh</string><string>-lc</string>
-    <string>. $HOME/doslineas/env.sh; cd $HOME/doslineas/podcast-tool; exec pnpm --filter @doslineas/worker start</string>
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/Users/USUARIO/doslineas/logs/worker.log</string>
-  <key>StandardErrorPath</key><string>/Users/USUARIO/doslineas/logs/worker.err</string>
-</dict>
-</plist>
-```
-
-```sh
-mkdir -p ~/doslineas/logs
-launchctl load -w ~/Library/LaunchAgents/com.doslineas.worker.plist
-```
-
-Un LaunchAgent corre con la sesión del usuario iniciada, que es lo que hace falta para que el montaje SMB del
-ATEM esté disponible. Si se quiere sin login, hay que montar el SMB desde el propio script.
-
-## 8. Operación diaria
-
-```sh
-pnpm cli status                      # la cola y los avisos
-pnpm cli retry <sesión> [--step <paso>]  # rescatar un paso
-pnpm cli confirm <sesión> --dry-run  # qué bruto se iría; sin la bandera, lo borra
-```
-
-El panel, en `http://localhost:4310`.
-
-## 9. Lo que queda por resolver en la máquina
-
-- **Cuánto disco libre** tiene el iMac para el área de trabajo, y **con qué formato** está el disco del ATEM.
-- **Rotar las credenciales** del FTP y regenerar el enlace de control remoto: viajaron en claro. Mejor VPN que
-  puertos publicados, sobre todo en un Ventura 13.7.8 que ya no recibe parches.
-- La IP pública es **dinámica** (Vodafone doméstico): ya cambió en 24 h. DDNS o VPN.
-- Probar un corte de energía de punta a punta: con `autorestart 1` y los LaunchAgents debería volver solo.
+- **Rotar las credenciales** del FTP, la del compartido y el enlace de DWService, porque viajaron en claro.
+  Mejor una VPN que puertos publicados, sobre todo en un Ventura que ya no recibe parches.
+- La IP pública es **dinámica** (Vodafone doméstico): DDNS o VPN.
+- Cronometrar un episodio real. La estimación de partida sigue siendo **2–4 h por episodio**, y el cuello no
+  es el encode sino **decodificar los 4 ISO con 4 núcleos**.
+- Probar un corte de luz de punta a punta.

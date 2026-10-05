@@ -8,6 +8,7 @@ import {
   SessionPipeline,
   SqliteAlertStore,
   SqliteJobQueue,
+  encoderFlags,
   readConfig
 } from "@doslineas/pipeline";
 import { RunnerService } from "./runner.service.js";
@@ -37,6 +38,7 @@ export function workerName(): string {
       useFactory: (config: PipelineConfig): StepRunner =>
         new CliStepRunner({
           repoRoot: config.repoRoot,
+          flags: encoderFlags(config.encoder),
           ...(config.transcriber === "mock" ? { commands: { transcribe: "mock-transcript" } } : {})
         })
     },
